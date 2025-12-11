@@ -321,8 +321,6 @@ async def listen_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
 
-
-
 def main():
     print("Старт бота...")
     load_table()
@@ -330,7 +328,6 @@ def main():
         print("Таблица пуста. Загрузите Excel файл.")
 
     app = ApplicationBuilder().token(TOKEN).build()
-
 
     app.add_handler(CommandHandler('start', start))
     app.add_handler(CommandHandler("listusers", list_users))

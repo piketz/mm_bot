@@ -7,8 +7,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxslt1-dev \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
-# Копируем зависимости
 COPY requirements.txt .
+ENV PYTHONUNBUFFERED=1
 RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 CMD ["python", "main.py"]
