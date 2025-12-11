@@ -1,17 +1,25 @@
-name: Deploy Docker 
+name: Deploy MM Bot
 
 on:
   push:
-    branches:
-      - main  
+    branches: ["main"]
 
 jobs:
   deploy:
-    runs-on: self-hosted  
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+    runs-on: self-hosted
 
-      - name: Deploy with Docker
-        run: |
-          docker build -t mm-bot:latest .
+    steps:
+      - name: Очистить директорию
+        run: rm -rf ./mm_bot || true
+
+      - name: Клонировать репозиторий
+        uses: actions/checkout@v4
+
+      - name: Остановить контейнер
+        run: docker compose down || true
+
+      - name: Построить и запустить заново
+        run: docker compose up -d --build
+
+      - name: Чтение лога
+        run: docker logs --tail=50 mm_bot
