@@ -23,7 +23,7 @@ jobs:
 
       - name: Проверить логи на старт бота
         run: |
-          sleep 5
+          sleep 60
           if ! docker logs mm_bot 2>&1 | grep -q "Бот запущен."; then
             echo "❌ Бот не запустился"
             docker logs mm_bot
