@@ -1,0 +1,12 @@
+version: "3.9"
+
+services:
+  mm_bot:
+    build: .
+    container_name: mm_bot
+    restart: unless-stopped
+    volumes:
+      - /home/ub/bot_uff_mm/config.json:/app/config.json
+      - /home/ub/bot_uff_mm/data.xlsx:/app/data.xlsx
+    environment:
+      - TZ=Asia/Yekaterinburg
