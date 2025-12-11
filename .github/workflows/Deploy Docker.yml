@@ -21,12 +21,11 @@ jobs:
       - name: Построить и запустить заново
         run: docker compose up -d --build
 
-      - name: Проверить что контейнер запущен
+      - name: Проверить логи на старт бота
         run: |
-          STATUS=$(docker inspect -f '{{.State.Running}}' mm_bot)
-          if [ "$STATUS" != "true" ]; then
-            echo "❌ Контейнер mm_bot не запущен!"
-            docker logs mm_bot || true
+          sleep 5
+          if ! docker logs mm_bot 2>&1 | grep -q "Бот запущен."; then
+            echo "❌ Бот не запустился"
+            docker logs mm_bot
             exit 1
           fi
-          echo "✔ Контейнер mm_bot успешно работает"
