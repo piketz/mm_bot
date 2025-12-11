@@ -1,0 +1,17 @@
+name: Deploy Docker 
+
+on:
+  push:
+    branches:
+      - main  
+
+jobs:
+  deploy:
+    runs-on: self-hosted  
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Deploy with Docker
+        run: |
+          docker build -t mm-bot:latest .
