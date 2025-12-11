@@ -21,5 +21,12 @@ jobs:
       - name: Построить и запустить заново
         run: docker compose up -d --build
 
-      - name: Чтение лога
-        run: docker logs --tail=50 mm_bot
+      - name: Проверить что контейнер запущен
+        run: |
+          STATUS=$(docker inspect -f '{{.State.Running}}' mm_bot)
+          if [ "$STATUS" != "true" ]; then
+            echo "❌ Контейнер mm_bot не запущен!"
+            docker logs mm_bot || true
+            exit 1
+          fi
+          echo "✔ Контейнер mm_bot успешно работает"
