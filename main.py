@@ -309,14 +309,14 @@ async def listen_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
             address = safe(row.get("полный адрес"))
 
             reply_lines = [
-                f"магазин: {mm_type} {shop} ({code})",
-                f"формат: {format_mm}",
-                f"филиал: {branch}",
-                f"дата открытия: {open_date}",
-                f"дата закрытия: {close_date}",
-                f"email: {email}",
-                f"фио системотехника: {tech} ({tech_phone})",
-                f"полный адрес: {address}",
+                f"Магазин: {mm_type} {shop} ({code})",
+                f"Формат: {format_mm}",
+                f"Филиал: {branch}",
+                f"Дата открытия: {open_date}",
+                f"Дата закрытия: {close_date}",
+                f"Email: {email}",
+                f"ФИО системотехника: {tech} ({tech_phone})",
+                f"Полный адрес: {address}",
             ]
 
             try:
