@@ -284,25 +284,47 @@ async def listen_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
             phone = "-"
 
         if full_report:
-            reply_lines = []
+            def safe(v):
+                return "-" if pd.isna(v) else str(v)
 
-            for col in row.index:
-                val = row[col]
-                if pd.isna(val):
-                    val = "-"
-                if col == "телефон системотехника":
-                    try:
-                        val = str(int(val))
-                    except:
-                        val = str(val)
-                reply_lines.append(f"{col}: {val}")
+            shop = safe(row.get("магазин"))
+            mm_type = safe(row.get("тип"))
+            code = safe(row.get("код"))
+            format_mm = safe(row.get("формат"))
+            branch = safe(row.get("филиал"))
+            open_date = safe(row.get("дата открытия"))
+            close_date = safe(row.get("дата закрытия"))
+            email = safe(row.get("email"))
+            tech = safe(row.get("фио системотехника"))
+
+            phone_val = row.get("телефон системотехника")
+            if pd.notna(phone_val):
+                try:
+                    tech_phone = str(int(phone_val))
+                except:
+                    tech_phone = str(phone_val)
+            else:
+                tech_phone = "-"
+
+            address = safe(row.get("полный адрес"))
+
+            reply_lines = [
+                f"магазин: {mm_type} {shop} ({code})",
+                f"формат: {format_mm}",
+                f"филиал: {branch}",
+                f"дата открытия: {open_date}",
+                f"дата закрытия: {close_date}",
+                f"email: {email}",
+                f"фио системотехника: {tech} ({tech_phone})",
+                f"полный адрес: {address}",
+            ]
 
             try:
                 mtime = os.path.getmtime("data.xlsx")
                 update_time = datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")
-                reply_lines.append(f"Дата обновления базы: {update_time}")
+                reply_lines.append(f"Дата обновления выгрузки: {update_time}")
             except:
-                reply_lines.append("Дата обновления базы: неизвестна")
+                reply_lines.append("Дата обновления выгрузки: неизвестна")
 
             reply = "\n".join(reply_lines)
 
