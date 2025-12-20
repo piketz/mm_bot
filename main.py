@@ -289,6 +289,7 @@ async def listen_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
             shop = safe(row.get("магазин"))
             mm_type = safe(row.get("тип"))
+            stst = safe(row.get("статус"))
             code = safe(row.get("код"))
             format_mm = safe(row.get("формат"))
             branch = safe(row.get("филиал"))
@@ -311,6 +312,7 @@ async def listen_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_lines = [
                 f"Магазин: {mm_type} {shop} ({code})",
                 f"Формат: {format_mm}",
+                f"Статус: {stst}",
                 f"Филиал: {branch}",
                 f"Дата открытия: {open_date}",
                 f"Дата закрытия: {close_date}",
