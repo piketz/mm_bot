@@ -259,12 +259,17 @@ async def listen_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not found:
             continue
 
-        now = datetime.now()
-        last_time = last_response_time.get(mm_norm)
-        if last_time and now - last_time < timedelta(hours=1):
-            print(f"⏳ Ограничение: уже отвечал по {mm_raw}")
-            return
-        last_response_time[mm_norm] = now
+        FULL_REPORT_KEYWORDS = ["полный отчет", "полностью", "отчет", "информация", "инфо", "статус"]
+        full_report = any(k in msg_norm for k in FULL_REPORT_KEYWORDS)
+
+        # 🔒 Лимит ТОЛЬКО для обычных запросов
+        if not full_report:
+            now = datetime.now()
+            last_time = last_response_time.get(mm_norm)
+            if last_time and now - last_time < timedelta(hours=1):
+                print(f"⏳ Ограничение: уже отвечал по {mm_raw}")
+                return
+            last_response_time[mm_norm] = now
 
         branch = str(row.get("филиал", "-")).strip()
         branch_suffix = f" ! {branch}" if branch.lower() == "уфа запад" else ""
@@ -277,8 +282,6 @@ async def listen_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 phone = str(phone_val)
         else:
             phone = "-"
-        FULL_REPORT_KEYWORDS = ["полный отчет", "полностью", "отчет", "информация", "инфо", "статус"]
-        full_report = any(k in msg_norm for k in FULL_REPORT_KEYWORDS)
 
         if full_report:
             reply_lines = []
