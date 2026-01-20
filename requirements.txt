@@ -4,4 +4,3 @@ openpyxl
 python-barcode
 reportlab
 pillow
-tempfile
