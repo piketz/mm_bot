@@ -1,3 +1,7 @@
 python-telegram-bot==22.5
 pandas
 openpyxl
+python-barcode
+reportlab
+pillow
+tempfile

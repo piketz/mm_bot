@@ -1,4 +1,3 @@
-
 import pandas as pd
 from datetime import datetime, timedelta
 from telegram import Update
@@ -9,14 +8,22 @@ from telegram.ext import (
 import time
 import os
 import re
-from telegram import ReactionTypeEmoji
 import json
 
+# === BARCODE / PDF ===
+import barcode
+from barcode.writer import ImageWriter
+from reportlab.pdfgen import canvas
+from reportlab.lib.units import mm
+from reportlab.lib.utils import ImageReader
+import tempfile
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 
+pdfmetrics.registerFont(TTFont("DejaVu", "ttf/DejaVuSans.ttf"))
 CONFIG_FILE = "config.json"
 
 def load_config():
-
     if not os.path.exists(CONFIG_FILE):
         config = {
             "bot_token": os.getenv("BOT_TOKEN", ""),
@@ -40,9 +47,11 @@ def load_config():
 
     return config
 
+
 def save_config(data):
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=4)
+
 
 config = load_config()
 TOKEN = config["bot_token"]
@@ -76,6 +85,83 @@ REQUIRED_COLUMNS = [
     "филиал"
 ]
 
+def generate_barcode(code: str, filename: str):
+    Code128 = barcode.get_barcode_class("code128")
+    obj = Code128(code, writer=ImageWriter())
+    obj.save(
+        filename,
+        {
+            "module_width": 0.25,
+            "module_height": 5,
+            "font_size": 0,
+            "quiet_zone": 1,
+            "write_text": False
+        }
+    )
+
+
+def generate_labels_pdf(items: list[tuple[str, str]], pdf_path: str):
+    c = canvas.Canvas(pdf_path, pagesize=(60*mm, 30*mm))
+    c.setFont("DejaVu", 7)
+
+    tmp_dir = tempfile.gettempdir()
+
+    for code, name in items:
+        barcode_base = os.path.join(tmp_dir, code)
+        barcode_png = barcode_base + ".png"
+
+        generate_barcode(code, barcode_base)
+
+        img = ImageReader(barcode_png)
+
+        # штрихкод
+        c.drawImage(
+            img,
+            5*mm,
+            10*mm,
+            width=50*mm,
+            height=5*mm,
+            preserveAspectRatio=True,
+            mask="auto"
+        )
+
+        # код под штрихкодом
+        c.setFont("DejaVu", 7)
+        c.drawCentredString(30 * mm, 6 * mm, code)
+
+        # название КЕ, центрируем
+        text_obj = c.beginText()
+        text_obj.setFont("DejaVu", 6)
+        text_lines = split_text(name, 28)
+        y_start = 26 * mm  # верхний отступ
+        for i, line in enumerate(text_lines):
+            text_obj.setTextOrigin(30 * mm, y_start - i * 5)  # вертикальный шаг
+            text_obj.textLine(line.center(28))
+        c.drawText(text_obj)
+
+
+        c.showPage()
+
+        if os.path.exists(barcode_png):
+            os.remove(barcode_png)
+
+    c.save()
+
+
+def split_text(text: str, max_len: int):
+    """Разбиваем текст на строки для наклейки"""
+    words = text.split()
+    lines = []
+    current = ""
+    for w in words:
+        if len(current) + len(w) + 1 <= max_len:
+            current += (" " if current else "") + w
+        else:
+            lines.append(current)
+            current = w
+    if current:
+        lines.append(current)
+    return lines
 
 def load_table():
     global df
@@ -170,8 +256,7 @@ async def list_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_allowed(update.effective_user.id):
-        return await update.message.reply_text("⛔ У вас нет доступа.")
-
+        return await update.message.reply_text("⛔ У вас нет доступа к данным.")
     await update.message.reply_text("Бот активирован и слушает.")
 
 
@@ -348,6 +433,103 @@ async def listen_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
 
+async def label_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    lines = update.message.text.strip().split("\n")
+    user = update.effective_user
+
+    if len(lines) < 2:
+        await update.message.reply_text(
+            "❌ Формат:\n"
+            "/label\n"
+            "0000000907115 Ажур Стационарный сканер ШК 2D (сканирует QR)\n"
+            "0000000555631 Ажур Ручной сканер ШК 2D (сканирует QR)"
+        )
+        return
+
+    # Парсим входные строки
+    items = []
+    shops = set()
+    for line in lines[1:]:
+        if not line.strip():
+            continue
+        parts = line.strip().split(maxsplit=2)
+        if len(parts) < 3:
+            await update.message.reply_text(f"❌ Ошибка в строке:\n{line}")
+            return
+        code, shop, name = parts
+        items.append((code.strip(), shop.strip(), name.strip()))
+        shops.add(shop.strip())
+
+    if not items:
+        await update.message.reply_text("❌ Нет данных для генерации")
+        return
+
+    tmp_dir = tempfile.gettempdir()
+    pdf_path = os.path.join(tmp_dir, "labels.pdf")
+    c = canvas.Canvas(pdf_path, pagesize=(60 * mm, 30 * mm))
+
+    # 🔹 Если есть один магазин, делаем наклейку с названием магазина
+    if len(shops) == 1:
+        shop_name = list(shops)[0]
+        c.setFont("DejaVu", 10)
+        c.drawCentredString(30 * mm, 15 * mm, shop_name)
+        c.showPage()
+
+    # 🔹 Генерация наклеек для каждой КЕ
+    for code, shop, name in items:
+        barcode_base = os.path.join(tmp_dir, code)
+        barcode_png = barcode_base + ".png"
+
+        # Функция генерации PNG штрихкода
+        generate_barcode(code, barcode_base)
+
+        img = ImageReader(barcode_png)
+
+        # штрихкод
+        c.drawImage(
+            img,
+            5 * mm,
+            8 * mm,
+            width=50 * mm,
+            height=15 * mm,
+            preserveAspectRatio=True,
+            mask="auto"
+        )
+
+        # код под штрихкодом
+        c.setFont("DejaVu", 7)
+        c.drawCentredString(30 * mm, 6 * mm, code)
+
+        # название КЕ, центрируем
+        text_obj = c.beginText()
+        text_obj.setFont("DejaVu", 6)
+        text_lines = split_text(name, 28)
+        y_start = 26 * mm  # верхний отступ
+        for i, line in enumerate(text_lines):
+            # ширина строки в точках
+            text_width = c.stringWidth(line, "DejaVu", 6)
+            # координата x = центр наклейки
+            x = (60 * mm - text_width) / 2
+            y = y_start - i * 5 * mm
+            c.drawString(x, y, line)
+        c.drawText(text_obj)
+
+        c.showPage()  # новая наклейка
+
+        if os.path.exists(barcode_png):
+            os.remove(barcode_png)
+
+    c.save()
+
+    await update.message.reply_document(
+        document=open(pdf_path, "rb"),
+        filename=shop_name+'.pdf'
+    )
+    print(f"Генерация КЕ файл {shop_name+'.pdf'} от {user.full_name} ({user.id}).")
+
+    os.remove(pdf_path)
+
 def main():
     print("Старт бота...")
     load_table()
@@ -359,6 +541,7 @@ def main():
     app.add_handler(CommandHandler('start', start))
     app.add_handler(CommandHandler("listusers", list_users))
     app.add_handler(CommandHandler("adduser", add_user))
+    app.add_handler(CommandHandler("label", label_cmd))
     app.add_handler(MessageHandler(filters.Document.ALL, update_excel))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, listen_chat))
 
