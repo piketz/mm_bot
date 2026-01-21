@@ -260,44 +260,80 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Бот активирован и слушает.")
 
 
-async def update_excel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def \
+        update_excel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat = update.effective_chat
-    print(f"[CHAT:{chat.title if chat.title else chat.id}] {user.full_name} ({user.id}) отправил файл: {update.message.document.file_name}")
+
+    if not update.message or not update.message.document:
+        return
+
+    document = update.message.document
+    print(
+        f"[CHAT:{chat.title if chat.title else chat.id}] "
+        f"{user.full_name} ({user.id}) отправил файл: {document.file_name}"
+    )
 
     if not is_allowed(user.id):
         return await update.message.reply_text("⛔ У вас нет доступа.")
 
-    if not update.message.document:
-        return
+    if not document.file_name.lower().endswith(".xlsx"):
+        return await update.message.reply_text("❌ Требуется Excel (.xlsx) файл.")
 
-    file = update.message.document
+    file = await document.get_file()
+    await file.download_to_drive("data.xlsx")
 
-    if not file.file_name.lower().endswith(".xlsx"):
-        return await update.message.reply_text("Требуется Excel (.xlsx) файл!")
+    try:
+        temp_df = pd.read_excel("data.xlsx")
+    except Exception as e:
+        return await update.message.reply_text(f"❌ Ошибка чтения Excel: {e}")
 
-    new_file = await file.get_file()
-    await new_file.download_to_drive("data.xlsx")
-
-    temp_df = pd.read_excel("data.xlsx")
     temp_df.columns = [str(c).strip().lower() for c in temp_df.columns]
-    required_cols = ["код", "магазин", "статус", "тип", "фио системотехника", "телефон системотехника", "филиал"]
-    if not all(col in temp_df.columns for col in required_cols):
-        missing = [col for col in required_cols if col not in temp_df.columns]
-        await update.message.reply_text(f"❌ Файл не содержит обязательные столбцы: {', '.join(missing)}")
-        return
+
+    required_cols = {
+        "код",
+        "магазин",
+        "статус",
+        "тип",
+        "фио системотехника",
+        "телефон системотехника",
+        "филиал",
+    }
+
+    missing = required_cols - set(temp_df.columns)
+    if missing:
+        return await update.message.reply_text(
+            f"❌ Нет обязательных столбцов: {', '.join(missing)}"
+        )
 
     temp_df = temp_df[temp_df["филиал"].isin(["Уфа Восток", "Уфа Запад"])]
+
     if temp_df.empty:
-        return await update.message.reply_text("❌ Файл не содержит строки с филиалами Уфа Восток или Уфа Запад.")
+        return await update.message.reply_text(
+            "❌ В файле нет строк с филиалами Уфа Восток или Уфа Запад."
+        )
+
+    temp_df = temp_df.reset_index(drop=True)
 
     global df
-    if df is not None and df.equals(temp_df):
-        await update.message.reply_text("❌ Файл не обновлён. Данные совпадают с текущей таблицей.")
-        return
 
-    df = temp_df.copy()
-    await update.message.reply_text(f"✔ Таблица успешно обновлена! Количество ММ: {len(df)}")
+    if df is not None:
+        if (
+            len(df) == len(temp_df)
+            and set(df.columns) == set(temp_df.columns)
+            and df.sort_values(list(df.columns)).reset_index(drop=True)
+            .equals(
+                temp_df.sort_values(list(temp_df.columns)).reset_index(drop=True)
+            )
+        ):
+            return await update.message.reply_text(
+                "ℹ️ Данные не изменились. Таблица не обновлялась."
+            )
+
+    df = temp_df
+    await update.message.reply_text(
+        f"✅ Таблица обновлена!\n📊 Количество ММ: {len(df)}"
+    )
 
 
 
