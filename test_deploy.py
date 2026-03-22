@@ -60,7 +60,7 @@ def test_secrets():
         return False
 
 def main():
-    os.chdir(os.path.expanduser('~/.openclaw/workspace/mm_bot'))
+    os.chdir(os.getcwd()) # test runs in repo dir
     
     results = []
     results.append(test_syntax())
