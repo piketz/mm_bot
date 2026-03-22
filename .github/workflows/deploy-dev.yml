@@ -1,0 +1,28 @@
+name: Deploy MM Bot (Dev)
+
+on:
+  push:
+    branches:
+      - dev
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: dev
+
+      - name: Prepare env
+        env:
+          BOT_TOKEN_DEV: ${{ secrets.BOT_TOKEN_DEV }}
+        run: |
+          echo "BOT_TOKEN=$BOT_TOKEN_DEV" > .env
+          cat .env
+
+      - name: Build and start
+        env:
+          BOT_TOKEN_DEV: ${{ secrets.BOT_TOKEN_DEV }}
+        run: |
+          docker compose up -d --build
