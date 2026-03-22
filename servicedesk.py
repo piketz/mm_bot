@@ -153,8 +153,8 @@ async def sd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def sd_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    print(f"[CALLBACK] data={update.callback_query.data if update.callback_query else None}(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка кнопок"""
+    print(f"[CALLBACK] data={update.callback_query.data if update.callback_query else None}")
     query = update.callback_query
     await query.answer()
     chat_id = query.message.chat.id
