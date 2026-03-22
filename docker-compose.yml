@@ -9,4 +9,4 @@ services:
       - .env
     volumes:
       - ./config.json:/app/config.json:ro
-      - ./data.xlsx:/app/data.xlsx
+      - /home/ub/bot_uff_mm/data.xlsx:/app/data.xlsx
