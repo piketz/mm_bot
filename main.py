@@ -274,7 +274,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             shops_msg = "\n📊 База магазинов пуста"
     except Exception as e:
-        pass
+        print(f"Error reading data.xlsx: {e}")
     await update.message.reply_text("Бот активирован и слушает." + shops_msg)
 
 
