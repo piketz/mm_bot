@@ -278,6 +278,11 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 pass
             try:
                 df = pd.read_excel(xlsx_path)
+                df.columns = df.columns.str.lower().str.strip()
+                # Фильтр по филиалу
+                allowed_branches = ["уфа восток", "уфа запад"]
+                if "филиал" in df.columns:
+                    df = df[df["филиал"].astype(str).str.lower().str.strip().isin(allowed_branches)]
                 shops_msg = f"\n📊 Магазинов в базе: {len(df)}"
             except Exception as e:
                 shops_msg = f"\n📊 Ошибка чтения: {e}"
