@@ -67,7 +67,8 @@ def sd_get_incidents(token: str, group: str = "РГ Уфа Восток фили
 
 def parse_incident(entry: dict) -> dict:
     values = entry.get('values', entry)
-    # Пробуем разные названия полей
+    
+    # Short Description
     short_desc = (
         values.get('Short Description') or 
         values.get('Summary') or 
@@ -76,13 +77,32 @@ def parse_incident(entry: dict) -> dict:
         ''
     )[:80]
     
+    # Full Description
+    description = (
+        values.get('Description') or 
+        values.get('Detailed Description') or 
+        values.get('Notes') or
+        ''
+    )[:500]
+    
+    # SLA
+    sla = (
+        values.get('SLA') or
+        values.get('SLA Status') or
+        values.get('Service Level Agreement') or
+        values.get('SLA Deadline') or
+        ''
+    )
+    
     return {
         'inc_num': values.get('Incident Number', 'N/A'),
         'short_desc': short_desc or '—',
+        'description': description or '—',
         'assignee': values.get('Assignee Login ID', 'Нет'),
         'submit_date': values.get('Submit Date', '')[:10],
         'status': values.get('Status', ''),
         'priority': values.get('Priority', ''),
+        'sla': sla,
     }
 
 
@@ -220,9 +240,13 @@ async def sd_show_incidents(update: Update, context: ContextTypes.DEFAULT_TYPE, 
             inc = parse_incident(entry)
             text += f"🔹 #{inc['inc_num']}\n"
             text += f"   📝 {inc['short_desc']}\n"
+            if inc.get('description') and inc['description'] != '—':
+                text += f"   📄 {inc['description'][:100]}...\n"
             text += f"   👤 {inc['assignee']} | 📅 {inc['submit_date']}\n"
             if inc.get('priority'):
                 text += f"   ⭐ {inc['priority']}\n"
+            if inc.get('sla'):
+                text += f"   ⏰ SLA: {inc['sla']}\n"
             text += "\n"
         
         keyboard = [[InlineKeyboardButton("🔄 Обновить", callback_data="sd_refresh")]]
