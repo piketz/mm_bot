@@ -109,10 +109,12 @@ async def sd_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def sd_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    print(f"[SD_MESSAGE] chat_id={update.message.chat.id}, text={update.message.text[:20]}")
     """Обработка текстовых сообщений для авторизации"""
     chat_id = update.message.chat.id
     text = update.message.text.strip()
     state = sd_states.get(chat_id)
+    print(f"[SD_STATE] chat_id={chat_id}, state={state}")
     
     if state == "awaiting_login":
         sd_sessions[chat_id] = {"login_id": text}
