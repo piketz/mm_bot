@@ -265,7 +265,17 @@ async def list_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_allowed(update.effective_user.id):
         return await update.message.reply_text("⛔ У вас нет доступа к данным.")
-    await update.message.reply_text("Бот активирован и слушает.")
+    shops_msg = ""
+    try:
+        import os
+        if os.path.exists("data.xlsx"):
+            df = pd.read_excel("data.xlsx")
+            shops_msg = f"\n📊 Магазинов в базе: {len(df)}"
+        else:
+            shops_msg = "\n📊 База магазинов пуста"
+    except Exception as e:
+        pass
+    await update.message.reply_text("Бот активирован и слушает." + shops_msg)
 
 
 async def \
