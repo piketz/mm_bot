@@ -16,7 +16,7 @@ jobs:
 
       - name: Run tests
         run: |
-          python3 test_deploy.py
+          python test_deploy.py
 
       - name: Prepare env
         env:
