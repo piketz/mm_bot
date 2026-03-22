@@ -14,12 +14,15 @@ jobs:
         with:
           ref: dev
 
+      - name: Run tests
+        run: |
+          python3 test_deploy.py
+
       - name: Prepare env
         env:
           BOT_TOKEN_DEV: ${{ secrets.BOT_TOKEN_DEV }}
         run: |
           echo "BOT_TOKEN=$BOT_TOKEN_DEV" > .env
-          cat .env
 
       - name: Build and start
         env:
