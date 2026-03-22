@@ -607,11 +607,11 @@ def main():
     app.add_handler(CommandHandler("adduser", add_user))
     app.add_handler(CommandHandler("label", label_cmd))
     app.add_handler(MessageHandler(filters.Document.ALL, update_excel))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, listen_chat))
-    
-    # ServiceDesk handlers
+    # ServiceDesk handlers - ДО listen_chat!
     if HAS_SERVICEDESK:
         register_sd_handlers(app)
+    
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, listen_chat))
 
     print("Бот запущен.")
     app.run_polling()
