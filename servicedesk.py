@@ -109,7 +109,6 @@ async def sd_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def sd_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
     """Обработка текстовых сообщений для авторизации"""
     chat_id = update.message.chat.id
     text = update.message.text.strip()
