@@ -202,6 +202,7 @@ async def sd_show_incidents(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     await context.bot.send_message(chat_id, "🔄 Загружаю заявки...")
     
     try:
+        print("[DEBUG] Sample entry:", json.dumps(entries[0] if entries else {}, indent=2)[:2000])
         entries = sd_get_incidents(session["token"])
         
         # Фильтрация по логину
