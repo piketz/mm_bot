@@ -206,7 +206,7 @@ async def sd_show_incidents(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         
         # Фильтрация по логину
         if filter_type == "my" and login_id:
-            entries = [e for e in entries if login_id.lower() in parse_incident(e).get("assignee", "").lower()]
+            entries = [e for e in entries if str(login_id).lower() in str(parse_incident(e).get("assignee", "")).lower()]
         
         if not entries:
             await context.bot.send_message(chat_id, "📭 Заявок не найдено")
