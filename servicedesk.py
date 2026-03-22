@@ -106,11 +106,15 @@ async def sd_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.message.reply_text("Введите токен:")
     elif query.data == "sd_refresh":
         await sd_show_incidents(update, context, chat_id)
+    elif query.data == "sd_all":
+        await sd_show_incidents(update, context, chat_id, filter_type="all")
+    elif query.data == "sd_my":
+        await sd_show_incidents(update, context, chat_id, filter_type="my")
 
 
 async def sd_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    print(f"[SD_MESSAGE] chat_id={update.message.chat.id}, text={update.message.text[:20]}")
     """Обработка текстовых сообщений для авторизации"""
+    print(f"[SD_MESSAGE] chat_id={update.message.chat.id}, text={update.message.text[:20]}")
     chat_id = update.message.chat.id
     text = update.message.text.strip()
     state = sd_states.get(chat_id)
@@ -129,8 +133,17 @@ async def sd_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             token = sd_login(login_id, text)
             sd_sessions[chat_id] = {"token": token, "login_id": login_id}
             sd_states.pop(chat_id, None)
-            await update.message.reply_text("✅ Успешно авторизован!")
-            await sd_show_incidents(update, context, chat_id)
+            
+            # Показываем меню выбора
+            keyboard = [
+                [InlineKeyboardButton("📋 Все заявки", callback_data="sd_all")],
+                [InlineKeyboardButton("👤 Мои заявки", callback_data="sd_my")],
+            ]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await update.message.reply_text(
+                f"✅ Успешно авторизован!\n👤 Логин: {login_id}\n\nВыберите:",
+                reply_markup=reply_markup
+            )
         except Exception as e:
             await update.message.reply_text(f"❌ Ошибка: {str(e)}")
             sd_states.pop(chat_id, None)
@@ -151,9 +164,11 @@ async def sd_my(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await sd_show_incidents(update, context, update.message.chat.id)
 
 
-async def sd_show_incidents(update: Update, context: ContextTypes.DEFAULT_TYPE, chat_id: int):
+async def sd_show_incidents(update: Update, context: ContextTypes.DEFAULT_TYPE, chat_id: int, filter_type: str = "all"):
     """Показать заявки"""
     session = sd_sessions.get(chat_id)
+    login_id = session.get("login_id", "") if session else ""
+    
     if not session or not session.get("token"):
         # Кнопка для авторизации
         keyboard = [
@@ -179,11 +194,16 @@ async def sd_show_incidents(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     try:
         entries = sd_get_incidents(session["token"])
         
+        # Фильтрация по логину
+        if filter_type == "my" and login_id:
+            entries = [e for e in entries if login_id.lower() in parse_incident(e).get("assignee", "").lower()]
+        
         if not entries:
             await context.bot.send_message(chat_id, "📭 Заявок не найдено")
             return
         
-        text = f"📋 Заявок (Assigned): {len(entries)}\n\n"
+        title = "Мои заявки" if filter_type == "my" else "Все заявки"
+        text = f"📋 {title} (Assigned): {len(entries)}\n\n"
         
         for i, entry in enumerate(entries[:10], 1):
             inc = parse_incident(entry)
