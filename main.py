@@ -268,9 +268,19 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     shops_msg = ""
     try:
         import os
-        if os.path.exists("data.xlsx"):
-            df = pd.read_excel("data.xlsx")
-            shops_msg = f"\n📊 Магазинов в базе: {len(df)}"
+        import stat
+        xlsx_path = "data.xlsx"
+        if os.path.exists(xlsx_path):
+            # Fix permissions if needed
+            try:
+                os.chmod(xlsx_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
+            except:
+                pass
+            try:
+                df = pd.read_excel(xlsx_path)
+                shops_msg = f"\n📊 Магазинов в базе: {len(df)}"
+            except Exception as e:
+                shops_msg = f"\n📊 Ошибка чтения: {e}"
         else:
             shops_msg = "\n📊 База магазинов пуста"
     except Exception as e:
