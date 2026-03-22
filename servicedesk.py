@@ -21,10 +21,21 @@ API_JWT_LOGIN = f"{BASE_URL}/api/jwt/login"
 API_INCIDENTS = f"{BASE_URL}/api/arsys/v1/entry/HPD:Help%20Desk"
 
 # Хранилище сессий
-sd_sessions = {}      # user_id -> {"token": str, "login_id": str}
+sd_sessions = {}
+SD_TOKENS_FILE = "sd_tokens.json"      # user_id -> {"token": str, "login_id": str}
 sd_states = {}        # user_id -> state
 
 # === SERVICEDESK API ===
+def load_sd_tokens():
+    try:
+        with open(SD_TOKENS_FILE, "r") as f:
+            return json.load(f)
+    except:
+        return {}
+
+def save_sd_tokens(tokens):
+    with open(SD_TOKENS_FILE, "w") as f:
+        json.dump(tokens, f)
 def sd_login(login_id: str, password: str) -> str:
     """Авторизация в ServiceDesk"""
     data = urllib.parse.urlencode({'username': login_id, 'password': password}).encode('utf-8')
@@ -109,6 +120,25 @@ def parse_incident(entry: dict) -> dict:
 # === ОБРАБОТЧИКИ TELEGRAM ===
 async def sd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Команда /sd - начало работы с ServiceDesk"""
+    chat_id = update.effective_chat.id
+    
+    # Проверяем сохранённый токен
+    tokens = load_sd_tokens()
+    if str(chat_id) in tokens:
+        saved = tokens[str(chat_id)]
+        sd_sessions[chat_id] = saved
+        # Показываем меню
+        keyboard = [
+            [InlineKeyboardButton("📋 Все заявки", callback_data="sd_all")],
+            [InlineKeyboardButton("👤 Мои заявки", callback_data="sd_my")],
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.message.reply_text(
+            f"🔐 Сессия восстановлена\n👤 Логин: {saved.get('login_id')}\n\nВыберите:",
+            reply_markup=reply_markup
+        )
+        return
+    
     keyboard = [
         [InlineKeyboardButton("🔑 Логин + Пароль", callback_data="sd_auth_login")],
         [InlineKeyboardButton("🎫 Токен", callback_data="sd_auth_token")],
@@ -163,6 +193,11 @@ async def sd_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             token = sd_login(login_id, text)
             sd_sessions[chat_id] = {"token": token, "login_id": login_id}
             sd_states.pop(chat_id, None)
+            
+            # Сохраняем токен для пользователя
+            tokens = load_sd_tokens()
+            tokens[str(chat_id)] = {"token": token, "login_id": login_id}
+            save_sd_tokens(tokens)
             
             # Показываем меню выбора
             keyboard = [

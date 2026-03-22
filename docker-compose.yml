@@ -10,3 +10,4 @@ services:
     volumes:
       - ./config.json:/app/config.json:ro
       - /home/ub/bot_uff_mm/data.xlsx:/app/data.xlsx
+      - /home/ub/bot_uff_mm/sd_tokens.json:/app/sd_tokens.json
