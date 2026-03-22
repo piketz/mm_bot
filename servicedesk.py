@@ -67,12 +67,22 @@ def sd_get_incidents(token: str, group: str = "РГ Уфа Восток фили
 
 def parse_incident(entry: dict) -> dict:
     values = entry.get('values', entry)
+    # Пробуем разные названия полей
+    short_desc = (
+        values.get('Short Description') or 
+        values.get('Summary') or 
+        values.get('Description') or 
+        values.get('Short_Description') or
+        ''
+    )[:80]
+    
     return {
         'inc_num': values.get('Incident Number', 'N/A'),
-        'short_desc': values.get('Short Description', '')[:50],
+        'short_desc': short_desc or '—',
         'assignee': values.get('Assignee Login ID', 'Нет'),
         'submit_date': values.get('Submit Date', '')[:10],
         'status': values.get('Status', ''),
+        'priority': values.get('Priority', ''),
     }
 
 
@@ -207,10 +217,12 @@ async def sd_show_incidents(update: Update, context: ContextTypes.DEFAULT_TYPE, 
         
         for i, entry in enumerate(entries[:10], 1):
             inc = parse_incident(entry)
-            text += f"{i}. #{inc['inc_num']}\n"
+            text += f"🔹 #{inc['inc_num']}\n"
             text += f"   📝 {inc['short_desc']}\n"
-            text += f"   👤 {inc['assignee']}\n"
-            text += f"   📅 {inc['submit_date']}\n\n"
+            text += f"   👤 {inc['assignee']} | 📅 {inc['submit_date']}\n"
+            if inc.get('priority'):
+                text += f"   ⭐ {inc['priority']}\n"
+            text += "\n"
         
         keyboard = [[InlineKeyboardButton("🔄 Обновить", callback_data="sd_refresh")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
