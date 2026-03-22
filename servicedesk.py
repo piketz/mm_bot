@@ -153,6 +153,7 @@ async def sd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def sd_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    print(f"[CALLBACK] data={update.callback_query.data if update.callback_query else None}(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка кнопок"""
     query = update.callback_query
     await query.answer()
@@ -300,7 +301,7 @@ def register_sd_handlers(app):
     """Добавить обработчики ServiceDesk в бота"""
     app.add_handler(CommandHandler("sd", sd_start))
     app.add_handler(CommandHandler("my", sd_my))
-    app.add_handler(CallbackQueryHandler(sd_callback, pattern="^sd_"))
+    app.add_handler(CallbackQueryHandler(sd_callback))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, sd_message))
     print("✅ ServiceDesk обработчики зарегистрированы")
 
