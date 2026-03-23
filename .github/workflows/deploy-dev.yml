@@ -7,29 +7,22 @@ on:
 
 jobs:
   deploy:
-    runs-on: self-hosted
-
+    name: Deploy to Dev
+    runs-on: ubud
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: dev
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Run tests
+      - name: Stop and remove existing container
         run: |
-          python test_deploy.py
-
-      - name: Prepare env
-        env:
-          BOT_TOKEN_DEV: ${{ secrets.BOT_TOKEN_DEV }}
-        run: |
-          echo "BOT_TOKEN=$BOT_TOKEN_DEV" > .env
-
-      - name: Stop existing container
-        run: |
-          docker compose down || true
+          docker rm -f mm_bot_dev || true
+          docker compose down --remove-orphans || true
 
       - name: Build and start
-        env:
-          BOT_TOKEN_DEV: ${{ secrets.BOT_TOKEN_DEV }}
         run: |
           docker compose up -d --build --force-recreate --remove-orphans
+
+      - name: Check logs
+        run: |
+          sleep 10
+          docker logs mm_bot_dev || true
