@@ -1,0 +1,47 @@
+# Полезные команды для OpenClaw
+
+## ACP / acpx
+
+# Установить конкретную версию acpx (нужна для работы плагина)
+cd /app/extensions/acpx && npm install acpx@0.1.16 --strict-ssl=false
+
+# Игнорировать проверку версии (если версия не совпадает)
+openclaw config set plugins.entries.acpx.config.expectedVersion "any"
+
+# Перезапустить gateway
+ps aux | grep openclaw-gateway | grep -v grep | awk '{print $2}' | head -1 | xargs -r kill; sleep 2; openclaw gateway &
+
+# Проверить версию acpx
+/app/extensions/acpx/node_modules/.bin/acpx --version
+
+## Gateway
+
+# Статус
+openclaw status
+
+# Логи
+openclaw logs
+
+# Остановить/запустить
+openclaw gateway stop
+openclaw gateway start
+
+## Конфиг
+
+# Просмотр конфига
+cat /home/node/.openclaw/openclaw.json
+
+# Установка параметров
+openclaw config set acp.enabled true
+openclaw config set acp.backend acpx
+openclaw config set acp.defaultAgent opencode
+openclaw config set acp.allowedAgents '["opencode", "codex", "claude"]'
+openclaw config set plugins.allow '["acpx", "telegram"]'
+
+## Плагины
+
+# Список плагинов
+openclaw plugins list
+
+# Установить плагин
+openclaw plugins install acpx

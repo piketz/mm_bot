@@ -1,0 +1,28 @@
+name: Deploy MM Bot (Prod)
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Deploy to Prod
+    runs-on: ubud
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Stop and remove existing container
+        run: |
+          docker rm -f mm_bot_prod || true
+          docker compose down --remove-orphans || true
+
+      - name: Build and start
+        run: |
+          docker compose up -d --build --force-recreate --remove-orphans
+
+      - name: Check logs
+        run: |
+          sleep 10
+          docker logs mm_bot_prod || true
