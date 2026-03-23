@@ -3,7 +3,7 @@ import servicedesk
 from datetime import datetime, timedelta
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
-    ApplicationBuilder, JobQueue,
+    JobQueue,
     ApplicationBuilder, MessageHandler, CommandHandler,
     ContextTypes, filters, CallbackQueryHandler
 )
