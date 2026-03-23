@@ -444,10 +444,9 @@ def main():
             app.add_handler(CommandHandler("listusers", list_users))
             app.add_handler(CommandHandler("adduser", add_user))
             app.add_handler(MessageHandler(filters.Document.ALL, update_excel))
+            servicedesk.register_sd_handlers(app)
             app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, listen_chat))
 
-            # ServiceDesk handlers
-            servicedesk.register_sd_handlers(app)
 
             print("Бот запущен и слушает чат.")
             app.run_polling()
