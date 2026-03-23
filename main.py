@@ -63,6 +63,7 @@ def save_config(data):
 
 config = load_config()
 TOKEN = os.getenv("BOT_TOKEN", "") or config.get("bot_token", "")
+print(f"🔑 Bot token prefix: {TOKEN[:4]}****")
 ADMINS = set(config["admins"])
 ALLOWED = set(config["allowed"])
 
