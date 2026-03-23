@@ -449,6 +449,7 @@ def main():
             app.add_handler(CommandHandler("adduser", add_user))
             app.add_handler(MessageHandler(filters.Document.ALL, update_excel))
             servicedesk.register_sd_handlers(app)
+            servicedesk.register_sd_background_task(app)
             # Register background task for SD incident polling (every 5 minutes)
             app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, listen_chat))
 
