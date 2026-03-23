@@ -9,7 +9,7 @@ import sys
 def test_syntax():
     """Test Python syntax"""
     print("📋 Testing syntax...")
-    for f in ["main.py", "servicedesk.py"]:
+    for f in ["mm_bot.py", "servicedesk.py"]:
         result = subprocess.run(["python3", "-m", "py_compile", f], capture_output=True)
         if result.returncode != 0:
             print(f"   ❌ {f} - syntax error")
@@ -38,7 +38,7 @@ def test_imports():
         # Don't run, just check compile
         import py_compile
 
-        py_compile.compile("main.py", doraise=True)
+        py_compile.compile("mm_bot.py", doraise=True)
         py_compile.compile("servicedesk.py", doraise=True)
         print("   ✓ imports OK")
         return True
@@ -52,7 +52,7 @@ def test_secrets():
     print("📋 Checking for secrets...")
     forbidden = ["ghp_", "BOT_TOKEN=6", "607"]
     try:
-        for f in ["main.py", "servicedesk.py"]:
+        for f in ["mm_bot.py", "servicedesk.py"]:
             with open(f) as fp:
                 content = fp.read()
                 for word in forbidden:
