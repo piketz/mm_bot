@@ -1,49 +1,49 @@
-import pandas as pd
-from datetime import datetime, timedelta
-from telegram import Update
-from telegram.ext import (
-    ApplicationBuilder, MessageHandler, CommandHandler,
-    ContextTypes, filters
-)
-import time
+import json
 import os
 import re
-import json
+import time
+from datetime import datetime, timedelta
+
+import pandas as pd
+from telegram import Update
+from telegram.ext import (ApplicationBuilder, CommandHandler, ContextTypes,
+                          MessageHandler, filters)
 
 # === SERVICEDESK ===
 try:
     from servicedesk import register_sd_handlers
+
     HAS_SERVICEDESK = True
 except ImportError:
     HAS_SERVICEDESK = False
-    print("⚠ ServiceDesk модуль не найден"); import traceback; traceback.print_exc()
+    print("⚠ ServiceDesk модуль не найден")
+    import traceback
+
+    traceback.print_exc()
+
+import tempfile
 
 # === BARCODE / PDF ===
 import barcode
 from barcode.writer import ImageWriter
-from reportlab.pdfgen import canvas
 from reportlab.lib.units import mm
 from reportlab.lib.utils import ImageReader
-import tempfile
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfgen import canvas
 
 pdfmetrics.registerFont(TTFont("DejaVu", "ttf/DejaVuSans.ttf"))
 CONFIG_FILE = "config.json"
 
+
 def load_config():
     if not os.path.exists(CONFIG_FILE):
-        config = {
-            "bot_token": os.getenv("BOT_TOKEN", ""),
-            "admins": [],
-            "allowed": []
-        }
+        config = {"bot_token": os.getenv("BOT_TOKEN", ""), "admins": [], "allowed": []}
         save_config(config)
         return config
 
     with open(CONFIG_FILE, "r", encoding="utf-8") as f:
         config = json.load(f)
-
 
     primary_admin = os.getenv("PRIMARY_ADMIN_ID")
     if primary_admin and int(primary_admin) not in config.get("admins", []):
@@ -78,8 +78,8 @@ def norm(text):
     if not text:
         return ""
     text = str(text).strip().lower()
-    text = re.sub(r'[^а-яa-z0-9\s]', '', text)
-    text = re.sub(r'\s+', ' ', text)
+    text = re.sub(r"[^а-яa-z0-9\s]", "", text)
+    text = re.sub(r"\s+", " ", text)
     return text
 
 
@@ -90,8 +90,9 @@ REQUIRED_COLUMNS = [
     "тип",
     "фио системотехника",
     "телефон системотехника",
-    "филиал"
+    "филиал",
 ]
+
 
 def generate_barcode(code: str, filename: str):
     Code128 = barcode.get_barcode_class("code128")
@@ -103,13 +104,13 @@ def generate_barcode(code: str, filename: str):
             "module_height": 5,
             "font_size": 0,
             "quiet_zone": 1,
-            "write_text": False
-        }
+            "write_text": False,
+        },
     )
 
 
 def generate_labels_pdf(items: list[tuple[str, str]], pdf_path: str):
-    c = canvas.Canvas(pdf_path, pagesize=(60*mm, 30*mm))
+    c = canvas.Canvas(pdf_path, pagesize=(60 * mm, 30 * mm))
     c.setFont("DejaVu", 7)
 
     tmp_dir = tempfile.gettempdir()
@@ -125,12 +126,12 @@ def generate_labels_pdf(items: list[tuple[str, str]], pdf_path: str):
         # штрихкод
         c.drawImage(
             img,
-            5*mm,
-            10*mm,
-            width=50*mm,
-            height=5*mm,
+            5 * mm,
+            10 * mm,
+            width=50 * mm,
+            height=5 * mm,
             preserveAspectRatio=True,
-            mask="auto"
+            mask="auto",
         )
 
         # код под штрихкодом
@@ -146,7 +147,6 @@ def generate_labels_pdf(items: list[tuple[str, str]], pdf_path: str):
             text_obj.setTextOrigin(30 * mm, y_start - i * 5)  # вертикальный шаг
             text_obj.textLine(line.center(28))
         c.drawText(text_obj)
-
 
         c.showPage()
 
@@ -171,6 +171,7 @@ def split_text(text: str, max_len: int):
         lines.append(current)
     return lines
 
+
 def load_table():
     global df
     print("📥 Попытка загрузки data.xlsx...")
@@ -187,10 +188,14 @@ def load_table():
             return
 
         allowed_branches = ["уфа восток", "уфа запад"]
-        filtered = tmp[tmp["филиал"].astype(str).str.lower().str.strip().isin(allowed_branches)]
+        filtered = tmp[
+            tmp["филиал"].astype(str).str.lower().str.strip().isin(allowed_branches)
+        ]
 
         if filtered.empty:
-            print("⚠ Внимание: нет строк с Филиал = 'Уфа Восток'. Таблица не обновлена.")
+            print(
+                "⚠ Внимание: нет строк с Филиал = 'Уфа Восток'. Таблица не обновлена."
+            )
         else:
             print(f"✔ Загружено ММ после фильтра по филиалам: {len(filtered)} строк")
             df = filtered
@@ -205,7 +210,6 @@ def load_table():
         print(f"⏱ Время загрузки файла: {elapsed:.2f} секунд")
 
 
-
 async def add_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user = update.effective_user
@@ -215,7 +219,9 @@ async def add_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = user.id
 
     if user_id not in ADMINS:
-        await update.effective_message.reply_text("❌ У вас нет прав для добавления пользователей.")
+        await update.effective_message.reply_text(
+            "❌ У вас нет прав для добавления пользователей."
+        )
         return
 
     if len(context.args) != 1:
@@ -229,7 +235,9 @@ async def add_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     if new_id in ALLOWED:
-        await update.effective_message.reply_text("ℹ Этот пользователь уже есть в списке.")
+        await update.effective_message.reply_text(
+            "ℹ Этот пользователь уже есть в списке."
+        )
         return
 
     ALLOWED.add(new_id)
@@ -260,8 +268,6 @@ async def list_users(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(text, parse_mode="Markdown")
 
 
-
-
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_allowed(update.effective_user.id):
         return await update.message.reply_text("⛔ У вас нет доступа к данным.")
@@ -269,11 +275,14 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         import os
         import stat
+
         xlsx_path = "data.xlsx"
         if os.path.exists(xlsx_path):
             # Fix permissions if needed
             try:
-                os.chmod(xlsx_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH)
+                os.chmod(
+                    xlsx_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH
+                )
             except:
                 pass
             try:
@@ -282,7 +291,13 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 # Фильтр по филиалу
                 allowed_branches = ["уфа восток", "уфа запад"]
                 if "филиал" in df.columns:
-                    df = df[df["филиал"].astype(str).str.lower().str.strip().isin(allowed_branches)]
+                    df = df[
+                        df["филиал"]
+                        .astype(str)
+                        .str.lower()
+                        .str.strip()
+                        .isin(allowed_branches)
+                    ]
                 shops_msg = f"\n📊 Магазинов в базе: {len(df)}"
             except Exception as e:
                 shops_msg = f"\n📊 Ошибка чтения: {e}"
@@ -293,8 +308,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Бот активирован и слушает." + shops_msg)
 
 
-async def \
-        update_excel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def update_excel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat = update.effective_chat
 
@@ -354,10 +368,9 @@ async def \
         if (
             len(df) == len(temp_df)
             and set(df.columns) == set(temp_df.columns)
-            and df.sort_values(list(df.columns)).reset_index(drop=True)
-            .equals(
-                temp_df.sort_values(list(temp_df.columns)).reset_index(drop=True)
-            )
+            and df.sort_values(list(df.columns))
+            .reset_index(drop=True)
+            .equals(temp_df.sort_values(list(temp_df.columns)).reset_index(drop=True))
         ):
             return await update.message.reply_text(
                 "ℹ️ Данные не изменились. Таблица не обновлялась."
@@ -369,7 +382,6 @@ async def \
     )
 
 
-
 async def listen_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.message or not update.message.text:
         return
@@ -377,7 +389,7 @@ async def listen_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     text_raw = update.message.text
 
-    #print(f"[CHAT:{chat.title if chat.title else chat.id}] {user.full_name} ({user.id}): {text_raw}")
+    # print(f"[CHAT:{chat.title if chat.title else chat.id}] {user.full_name} ({user.id}): {text_raw}")
 
     if not is_allowed(user.id):
         print(f"⛔ Доступ запрещён: {user.full_name} ({user.id})")
@@ -389,10 +401,16 @@ async def listen_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     msg_norm = norm(text_raw)
 
-    is_question = msg_norm.startswith("чей ") or msg_norm.startswith("какой ") or msg_norm.startswith("кто ")
+    is_question = (
+        msg_norm.startswith("чей ")
+        or msg_norm.startswith("какой ")
+        or msg_norm.startswith("кто ")
+    )
     bot_mentioned = context.bot.username.lower() in msg_norm
-    reply_to_bot = update.message.reply_to_message and \
-                    update.message.reply_to_message.from_user.id == context.bot.id
+    reply_to_bot = (
+        update.message.reply_to_message
+        and update.message.reply_to_message.from_user.id == context.bot.id
+    )
 
     use_partial = is_question or bot_mentioned or reply_to_bot
 
@@ -413,7 +431,14 @@ async def listen_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not found:
             continue
 
-        FULL_REPORT_KEYWORDS = ["полный отчет", "полностью", "отчет", "информация", "инфо", "статус"]
+        FULL_REPORT_KEYWORDS = [
+            "полный отчет",
+            "полностью",
+            "отчет",
+            "информация",
+            "инфо",
+            "статус",
+        ]
         full_report = any(k in msg_norm for k in FULL_REPORT_KEYWORDS)
 
         # 🔒 Лимит ТОЛЬКО для обычных запросов
@@ -438,6 +463,7 @@ async def listen_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
             phone = "-"
 
         if full_report:
+
             def safe(v):
                 return "-" if pd.isna(v) else str(v)
 
@@ -497,7 +523,7 @@ async def listen_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
             line2 = f"{tech} {phone}"
             reply = f"{line1}\n{line2}"
 
-       # print(f"✅ Бот отвечает на ММ: {mm_raw} (полный отчёт: {full_report})")
+        # print(f"✅ Бот отвечает на ММ: {mm_raw} (полный отчёт: {full_report})")
         await update.message.reply_text(reply, parse_mode="HTML")
         return
 
@@ -563,7 +589,7 @@ async def label_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
             width=50 * mm,
             height=15 * mm,
             preserveAspectRatio=True,
-            mask="auto"
+            mask="auto",
         )
 
         # код под штрихкодом
@@ -592,12 +618,12 @@ async def label_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     c.save()
 
     await update.message.reply_document(
-        document=open(pdf_path, "rb"),
-        filename=shop_name+'.pdf'
+        document=open(pdf_path, "rb"), filename=shop_name + ".pdf"
     )
     print(f"Генерация КЕ файл {shop_name+'.pdf'} от {user.full_name} ({user.id}).")
 
     os.remove(pdf_path)
+
 
 def main():
     print("Старт бота...")
@@ -607,7 +633,7 @@ def main():
 
     app = ApplicationBuilder().token(TOKEN).build()
 
-    app.add_handler(CommandHandler('start', start))
+    app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("listusers", list_users))
     app.add_handler(CommandHandler("adduser", add_user))
     app.add_handler(CommandHandler("label", label_cmd))
@@ -615,11 +641,12 @@ def main():
     # ServiceDesk handlers - ДО listen_chat!
     if HAS_SERVICEDESK:
         register_sd_handlers(app)
-    
+
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, listen_chat))
 
     print("Бот запущен.")
     app.run_polling()
+
 
 if __name__ == "__main__":
     main()

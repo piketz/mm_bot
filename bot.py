@@ -1,11 +1,14 @@
 """
 mm_bot - Telegram бот для ServiceDesk
 """
-import os
+
 import logging
+import os
+
 from loguru import logger
 from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram.ext import (Application, CommandHandler, ContextTypes,
+                          MessageHandler, filters)
 
 # Configure logging
 logger.add("logs/bot.log", rotation="10 MB", retention="7 days", level="INFO")
@@ -33,17 +36,15 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "/help - Показать справку\n"
         "/status - Статус подключения\n\n"
         "Просто отправь текст для создания заявки.",
-        parse_mode="Markdown"
+        parse_mode="Markdown",
     )
 
 
 async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Handle /status command"""
     await update.message.reply_text(
-        f"✅ *Статус:*\n\n"
-        f"Service Desk: {SERVICE_DESK_URL}\n"
-        f"Бот: Работает",
-        parse_mode="Markdown"
+        f"✅ *Статус:*\n\n" f"Service Desk: {SERVICE_DESK_URL}\n" f"Бот: Работает",
+        parse_mode="Markdown",
     )
 
 
@@ -69,7 +70,9 @@ def main():
     application.add_handler(CommandHandler("start", start_command))
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("status", status_command))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, echo_handler))
+    application.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, echo_handler)
+    )
 
     # Start polling
     logger.info("Starting bot polling...")
