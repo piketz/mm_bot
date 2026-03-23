@@ -1,10 +1,10 @@
-
 import pandas as pd
+import servicedesk
 from datetime import datetime, timedelta
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder, MessageHandler, CommandHandler,
-    ContextTypes, filters
+    ContextTypes, filters, CallbackQueryHandler
 )
 import time
 import os
@@ -206,6 +206,23 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_allowed(update.effective_user.id):
         return await update.message.reply_text("⛔ У вас нет доступа.")
 
+    keyboard = [
+        [InlineKeyboardButton("📋 Меню", callback_data="show_menu")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    welcome_text = """👋 Добро пожаловать в бот управления ММ!
+
+Нажмите кнопку ниже, чтобы открыть меню."""
+
+    await update.message.reply_text(welcome_text, reply_markup=reply_markup)
+
+
+async def menu_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик нажатия на кнопку Меню"""
+    query = update.callback_query
+    await query.answer()
+
     menu_text = """📋 <b>МЕНЮ</b>
 
 <b>Основные команды:</b>
@@ -221,7 +238,12 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 💡 Бот автоматически ищет магазины по названию или адресу"""
 
-    await update.message.reply_text(menu_text, parse_mode="HTML")
+    keyboard = [
+        [InlineKeyboardButton("📋 Меню", callback_data="show_menu")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await query.edit_message_text(menu_text, parse_mode="HTML", reply_markup=reply_markup)
 
 
 # -------------------------------------------------
@@ -252,7 +274,7 @@ async def update_excel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     required_cols = ["код", "магазин", "статус", "тип", "фио системотехника", "телефон системотехника", "филиал"]
     if not all(col in temp_df.columns for col in required_cols):
         missing = [col for col in required_cols if col not in temp_df.columns]
-        await update.message.reply_text(f"❌ Файл не содержит обязательные столбцы: {', '.join(missing)}")
+        await update.message.reply_text(f"❌ Файл не содержит обязательные колонки: {', '.join(missing)}")
         return
 
     # Фильтруем филиалы
@@ -418,10 +440,14 @@ def main():
             app = ApplicationBuilder().token(TOKEN).build()
 
             app.add_handler(CommandHandler('start', start))
+            app.add_handler(CallbackQueryHandler(menu_callback, pattern="show_menu"))
             app.add_handler(CommandHandler("listusers", list_users))
             app.add_handler(CommandHandler("adduser", add_user))
             app.add_handler(MessageHandler(filters.Document.ALL, update_excel))
             app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, listen_chat))
+
+            # ServiceDesk handlers
+            servicedesk.register_sd_handlers(app)
 
             print("Бот запущен и слушает чат.")
             app.run_polling()
