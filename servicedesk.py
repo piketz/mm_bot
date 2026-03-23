@@ -191,7 +191,7 @@ async def sd_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     
     # Load settings
-    global sd_user_settings
+    global sd_user_settings, sd_user_logins, last_incidents
     sd_user_settings = load_sd_settings()
     user_settings = sd_user_settings.get(str(chat_id), {
         'notifications_enabled': True,
@@ -226,7 +226,7 @@ async def sd_settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = query.message.chat.id
     
     # Load settings
-    global sd_user_settings
+    global sd_user_settings, sd_user_logins, last_incidents
     sd_user_settings = load_sd_settings()
     user_settings = sd_user_settings.get(str(chat_id), {
         'notifications_enabled': True,
@@ -270,7 +270,7 @@ async def sd_settings_callback(update: Update, context: ContextTypes.DEFAULT_TYP
     chat_id = query.message.chat.id
     
     # Load settings
-    global sd_user_settings
+    global sd_user_settings, sd_user_logins, last_incidents
     sd_user_settings = load_sd_settings()
     
     if not str(chat_id) in sd_user_settings:
@@ -384,7 +384,7 @@ async def sd_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             sd_user_logins[chat_id] = login_id
             
             # Initialize user settings if not exists
-            global sd_user_settings
+            global sd_user_settings, sd_user_logins, last_incidents
             sd_user_settings = load_sd_settings()
             if str(chat_id) not in sd_user_settings:
                 sd_user_settings[str(chat_id)] = {
@@ -417,7 +417,7 @@ async def sd_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         sd_user_logins[chat_id] = str(chat_id)
         
         # Initialize user settings if not exists
-        global sd_user_settings
+        global sd_user_settings, sd_user_logins, last_incidents
         sd_user_settings = load_sd_settings()
         if str(chat_id) not in sd_user_settings:
             sd_user_settings[str(chat_id)] = {
@@ -524,7 +524,7 @@ async def check_incidents_background(context: ContextTypes.DEFAULT_TYPE):
     bot = context.application.bot
     
     # Load settings
-    global sd_user_settings
+    global sd_user_settings, sd_user_logins, last_incidents
     sd_user_settings = load_sd_settings()
     
     if not sd_user_logins:
