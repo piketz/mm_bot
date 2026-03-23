@@ -1,0 +1,13 @@
+version: '3.3'
+
+services:
+  mm_bot_dev:
+    build: .
+    container_name: mm_bot_dev
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./config.json:/app/config.json:ro
+      - ./data.xlsx:/app/data.xlsx
+      - ./sd_tokens.json:/app/sd_tokens.json
