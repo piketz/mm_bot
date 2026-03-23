@@ -440,7 +440,16 @@ def main():
 
     while True:
         try:
-            app = ApplicationBuilder().token(TOKEN).build()
+            async def post_init_callback(app):
+                import os
+                version = os.getenv("BOT_VERSION", "unknown")
+                try:
+                    await app.bot.send_message(chat_id=4279064, text=f"Bot started! Version: {version}")
+                    print(f"Startup notification sent to admin (version: {version})")
+                except Exception as e:
+                    print(f"Failed to send startup notification: {e}")
+
+            app = ApplicationBuilder().token(TOKEN).post_init(post_init_callback).build()
             job_queue = app.job_queue
 
             app.add_handler(CommandHandler('start', start))
