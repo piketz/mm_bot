@@ -413,17 +413,27 @@ def main():
     if df.empty:
         print("Таблица пуста. Загрузите Excel файл.")
 
-    app = ApplicationBuilder().token(TOKEN).build()
+    while True:
+        try:
+            app = ApplicationBuilder().token(TOKEN).build()
 
+            app.add_handler(CommandHandler('start', start))
+            app.add_handler(CommandHandler("listusers", list_users))
+            app.add_handler(CommandHandler("adduser", add_user))
+            app.add_handler(MessageHandler(filters.Document.ALL, update_excel))
+            app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, listen_chat))
 
-    app.add_handler(CommandHandler('start', start))
-    app.add_handler(CommandHandler("listusers", list_users))
-    app.add_handler(CommandHandler("adduser", add_user))
-    app.add_handler(MessageHandler(filters.Document.ALL, update_excel))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, listen_chat))
-
-    print("Бот запущен и слушает чат.")
-    app.run_polling()
+            print("Бот запущен и слушает чат.")
+            app.run_polling()
+        except Exception as e:
+            error_str = str(e).lower()
+            if "invalidtoken" in error_str or "unauthorized" in error_str or "token" in error_str:
+                print(f"❌ Ошибка токена: {e}")
+                print("⏳ Жду 10 секунд перед повторной попыткой...")
+                import time
+                time.sleep(10)
+            else:
+                raise
 
 if __name__ == "__main__":
     main()
