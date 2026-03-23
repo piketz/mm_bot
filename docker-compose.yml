@@ -1,0 +1,16 @@
+version: '2.4'
+
+services:
+  bot:
+    build: .
+    container_name: mm_bot_prod
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      BOT_TOKEN: ${BOT_TOKEN}
+      SERVICE_DESK_URL: https://mobilebmc.tander.ru
+      LOG_LEVEL: INFO
+    volumes:
+      - ./logs:/app/logs
+      - .:/app
