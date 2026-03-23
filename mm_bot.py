@@ -3,7 +3,6 @@ import servicedesk
 from datetime import datetime, timedelta
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
-    JobQueue,
     ApplicationBuilder, MessageHandler, CommandHandler,
     ContextTypes, filters, CallbackQueryHandler
 )
@@ -441,8 +440,8 @@ def main():
 
     while True:
         try:
-            job_queue = JobQueue()
-            app = ApplicationBuilder().token(TOKEN).job_queue(job_queue).build()
+            app = ApplicationBuilder().token(TOKEN).build()
+            job_queue = app.job_queue
 
             app.add_handler(CommandHandler('start', start))
             app.add_handler(CallbackQueryHandler(menu_callback, pattern="show_menu"))
