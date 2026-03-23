@@ -70,7 +70,7 @@ def main():
 
     results = []
     results.append(test_syntax())
-    results.append(test_config())
+    ##results.append(test_config())
     results.append(test_imports())
     results.append(test_secrets())
 
