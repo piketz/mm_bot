@@ -383,10 +383,6 @@ async def sd_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             # Store user login for background polling
             sd_user_logins[chat_id] = login_id
             
-            # Initialize user settings if not exists
-            global sd_user_settings, sd_user_logins, last_incidents
-            sd_user_settings = load_sd_settings()
-            if str(chat_id) not in sd_user_settings:
                 sd_user_settings[str(chat_id)] = {
                     'notifications_enabled': True,
                     'interval_minutes': 5
