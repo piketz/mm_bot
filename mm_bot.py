@@ -301,6 +301,7 @@ async def listen_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # ---------------------------------------
     # Реакция на конкретного пользователя
     # ---------------------------------------
+
   #  try:
   #      if update.message.from_user and update.message.from_user.id == 4279064: # 8256795316
   #          await update.message.set_reaction(ReactionTypeEmoji("🔩"))
@@ -311,6 +312,11 @@ async def listen_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     chat = update.effective_chat
     text_raw = update.message.text
+    # Skip if user is in ServiceDesk session
+    import servicedesk
+    if chat.id in servicedesk.sd_sessions:
+        return  # Let SD handlers process this message
+
 
     # --------------------- ОТЛАДКА ---------------------
     print(f"[CHAT:{chat.title if chat.title else chat.id}] {user.full_name} ({user.id}): {text_raw}")
