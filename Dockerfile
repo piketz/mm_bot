@@ -23,4 +23,4 @@ RUN mkdir -p /app/logs
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 
-CMD ["python", "bot.py"]
+CMD ["python", "mm_bot.py"]
