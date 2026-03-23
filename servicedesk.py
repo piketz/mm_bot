@@ -24,6 +24,12 @@ sd_sessions = {}
 SD_TOKENS_FILE = "sd_tokens.json"  # user_id -> {"token": str, "login_id": str}
 sd_states = {}  # user_id -> state
 
+# === BACKGROUND POLLING: ХРАНИЛИЩЕ ПОЛЬЗОВАТЕЛЕЙ И ИНЦИДЕНТОВ ===
+# chat_id -> login_id mapping (for background polling)
+sd_user_logins = {}  # {chat_id: login_id}
+# last known incident IDs per login_id
+last_incidents = {}  # {login_id: set(incident_ids)}
+
 
 # === SERVICEDESK API ===
 def load_sd_tokens():
@@ -217,6 +223,15 @@ async def sd_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 [InlineKeyboardButton("👤 Мои заявки", callback_data="sd_my")],
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
+            # Store user login for background polling
+            sd_user_logins[chat_id] = login_id
+            # Store initial incidents for tracking
+            try:
+                entries = sd_get_incidents(session["token"])
+                last_incidents[login_id] = {parse_incident(e)["inc_num"] for e in entries}
+            except:
+                pass
+            
             await update.message.reply_text(
                 f"✅ Успешно авторизован!\n👤 Логин: {login_id}\n\nВыберите:",
                 reply_markup=reply_markup,
@@ -230,6 +245,8 @@ async def sd_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         sd_sessions[chat_id] = {"token": text}
         sd_states.pop(chat_id, None)
         await update.message.reply_text("✅ Токен сохранён!")
+        # For token auth, store chat_id for background polling
+        sd_user_logins[chat_id] = str(chat_id)
         await sd_show_incidents(update, context, chat_id)
     else:
         # Не в процессе авторизации - игнорируем
@@ -317,6 +334,60 @@ async def sd_show_incidents(
         await context.bot.send_message(chat_id, f"❌ Ошибка: {str(e)}")
         if "истёк" in str(e).lower():
             sd_sessions.pop(chat_id, None)
+
+
+# === BACKGROUND POLLING: ПРОВЕРКА НОВЫХ ИНЦИДЕНТОВ ===
+async def check_incidents_background(context: ContextTypes.DEFAULT_TYPE):
+    """Background task: проверяет новые инциденты каждые 5 минут"""
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    bot = context.application.bot
+    
+    if not sd_user_logins:
+        return
+    
+    for chat_id, login_id in list(sd_user_logins.items()):
+        try:
+            session = sd_sessions.get(chat_id)
+            if not session or not session.get("token"):
+                continue
+            
+            entries = sd_get_incidents(session["token"])
+            current_incident_ids = {parse_incident(e)["inc_num"] for e in entries}
+            previous_ids = last_incidents.get(login_id, set())
+            new_ids = current_incident_ids - previous_ids
+            
+            if new_ids:
+                new_incidents = [e for e in entries if parse_incident(e)["inc_num"] in new_ids]
+                
+                text = f"🔔 <b>Новые инциденты ({len(new_ids)})</b>\n\n"
+                
+                for entry in new_incidents[:5]:
+                    inc = parse_incident(entry)
+                    text += f"🔹 #{inc['inc_num']}\n"
+                    text += f"   📝 {inc['short_desc']}\n"
+                    text += f"   👤 {inc['assignee']} | 📅 {inc['submit_date']}\n\n"
+                
+                if len(new_incidents) > 5:
+                    text += f"... и ещё {len(new_incidents) - 5} инцидентов"
+                
+                try:
+                    await bot.send_message(chat_id, text, parse_mode="HTML")
+                except Exception as e:
+                    pass
+            
+            last_incidents[login_id] = current_incident_ids
+            
+        except Exception as e:
+            continue
+
+
+def register_sd_background_task(app):
+    """Зарегистрировать фоновую задачу проверки инцидентов"""
+    jq = app.job_queue
+    jq.run_repeating(check_incidents_background, interval=300, first=60)
+    print("✅ Background task for SD incident polling registered (every 5 minutes)")
 
 
 # === РЕГИСТРАЦИЯ В ПРИЛОЖЕНИИ ===
