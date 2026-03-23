@@ -314,9 +314,6 @@ async def listen_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     text_raw = update.message.text
     # Skip if user is in ServiceDesk session
-    import servicedesk
-    if chat.id in servicedesk.sd_sessions:
-        return  # Let SD handlers process this message
 
 
     # --------------------- ОТЛАДКА ---------------------
