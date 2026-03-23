@@ -30,12 +30,6 @@ sd_user_logins = {}  # {chat_id: login_id}
 # last known incident IDs per login_id
 last_incidents = {}  # {login_id: set(incident_ids)}
 
-# === НАСТРОЙКИ ПОЛЬЗОВАТЕЛЕЙ ===
-# chat_id -> {notifications_enabled: bool, interval_minutes: int}
-sd_user_settings = {}
-sd_user_logins = {}
-last_incidents = {}
-
 
 # === SERVICEDESK API ===
 def load_sd_tokens():
@@ -49,23 +43,6 @@ def load_sd_tokens():
 def save_sd_tokens(tokens):
     with open(SD_TOKENS_FILE, "w") as f:
         json.dump(tokens, f)
-
-
-def load_sd_settings():
-    """Загрузить настройки пользователей"""
-    settings_file = "sd_settings.json"
-    try:
-        with open(settings_file, "r") as f:
-            return json.load(f)
-    except:
-        return {}
-
-
-def save_sd_settings(settings):
-    """Сохранить настройки пользователей"""
-    settings_file = "sd_settings.json"
-    with open(settings_file, "w") as f:
-        json.dump(settings, f, ensure_ascii=False)
 
 
 def sd_login(login_id: str, password: str) -> str:
@@ -188,144 +165,6 @@ async def sd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
-async def sd_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Команда /sdmenu - показать меню ServiceDesk"""
-    chat_id = update.effective_chat.id
-    
-    # Load settings
-    global sd_user_settings
-    global sd_user_logins
-    global last_incidents
-    sd_user_settings = load_sd_settings()
-    user_settings = sd_user_settings.get(str(chat_id), {
-        'notifications_enabled': True,
-        'interval_minutes': 5
-    })
-    
-    keyboard = [
-        [InlineKeyboardButton("📋 Мои заявки", callback_data="sd_my")],
-        [InlineKeyboardButton("📋 Все заявки", callback_data="sd_all")],
-        [InlineKeyboardButton("⚙️ Настройки", callback_data="sd_settings")],
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    # Check if user is logged in
-    session = sd_sessions.get(chat_id)
-    login_info = f"\n👤 Логин: {session.get('login_id')}" if session and session.get('login_id') else ""
-    
-    # Show notification status
-    notif_status = "🔔" if user_settings.get('notifications_enabled', True) else "🔕"
-    interval = user_settings.get('interval_minutes', 5)
-    
-    await update.message.reply_text(
-        f"📋 ServiceDesk Меню{login_info}\n\n{notif_status} Уведомления: {'Вкл' if user_settings.get('notifications_enabled', True) else 'Выкл'} | Интервал: {interval} мин",
-        reply_markup=reply_markup,
-    )
-
-
-async def sd_settings_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Показать настройки уведомлений"""
-    query = update.callback_query
-    await query.answer()
-    chat_id = query.message.chat.id
-    
-    # Load settings
-    global sd_user_settings
-    global sd_user_logins
-    global last_incidents
-    sd_user_settings = load_sd_settings()
-    user_settings = sd_user_settings.get(str(chat_id), {
-        'notifications_enabled': True,
-        'interval_minutes': 5
-    })
-    
-    # Toggle button
-    notif_enabled = user_settings.get('notifications_enabled', True)
-    notif_btn_text = "🔕 Выключить уведомления" if notif_enabled else "🔔 Включить уведомления"
-    notif_btn_cb = "sd_notif_off" if notif_enabled else "sd_notif_on"
-    
-    # Interval buttons (radio-style)
-    intervals = [5, 10, 30, 60]
-    current_interval = user_settings.get('interval_minutes', 5)
-    interval_buttons = []
-    for intv in intervals:
-        prefix = "✅ " if intv == current_interval else ""
-        interval_buttons.append(InlineKeyboardButton(
-            f"{prefix}{intv} мин", 
-            callback_data=f"sd_interval_{intv}"
-        ))
-    
-    keyboard = [
-        [InlineKeyboardButton(notif_btn_text, callback_data=notif_btn_cb)],
-        interval_buttons,
-        [InlineKeyboardButton("🔙 Назад", callback_data="sd_menu_back")],
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    
-    await query.message.edit_text(
-        "⚙️ Настройки уведомлений\n\n"
-        "Выберите интервал проверки новых заявок:",
-        reply_markup=reply_markup,
-    )
-
-
-async def sd_settings_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработка настроек уведомлений"""
-    query = update.callback_query
-    await query.answer()
-    chat_id = query.message.chat.id
-    
-    # Load settings
-    global sd_user_settings
-    global sd_user_logins
-    global last_incidents
-    sd_user_settings = load_sd_settings()
-    
-    if not str(chat_id) in sd_user_settings:
-        sd_user_settings[str(chat_id)] = {
-            'notifications_enabled': True,
-            'interval_minutes': 5
-        }
-    
-    data = query.data
-    
-    if data == "sd_notif_on":
-        sd_user_settings[str(chat_id)]['notifications_enabled'] = True
-        save_sd_settings(sd_user_settings)
-        await sd_settings_menu(update, context)
-        
-    elif data == "sd_notif_off":
-        sd_user_settings[str(chat_id)]['notifications_enabled'] = False
-        save_sd_settings(sd_user_settings)
-        await sd_settings_menu(update, context)
-        
-    elif data.startswith("sd_interval_"):
-        interval = int(data.split("_")[-1])
-        sd_user_settings[str(chat_id)]['interval_minutes'] = interval
-        save_sd_settings(sd_user_settings)
-        await sd_settings_menu(update, context)
-        
-    elif data == "sd_menu_back":
-        # Return to main menu
-        keyboard = [
-            [InlineKeyboardButton("📋 Мои заявки", callback_data="sd_my")],
-            [InlineKeyboardButton("📋 Все заявки", callback_data="sd_all")],
-            [InlineKeyboardButton("⚙️ Настройки", callback_data="sd_settings")],
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        session = sd_sessions.get(chat_id)
-        login_info = f"\n👤 Логин: {session.get('login_id')}" if session and session.get('login_id') else ""
-        user_settings = sd_user_settings.get(str(chat_id), {'notifications_enabled': True, 'interval_minutes': 5})
-        notif_status = "🔔" if user_settings.get('notifications_enabled', True) else "🔕"
-        interval = user_settings.get('interval_minutes', 5)
-        
-        await query.message.edit_text(
-            f"📋 ServiceDesk Меню{login_info}\n\n{notif_status} Уведомления: {'Вкл' if user_settings.get('notifications_enabled', True) else 'Выкл'} | Интервал: {interval} мин",
-            reply_markup=reply_markup,
-        )
-
-
 async def sd_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка кнопок"""
     print(
@@ -347,10 +186,6 @@ async def sd_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await sd_show_incidents(update, context, chat_id, filter_type="all")
     elif query.data == "sd_my":
         await sd_show_incidents(update, context, chat_id, filter_type="my")
-    elif query.data == "sd_settings":
-        await sd_settings_menu(update, context)
-    elif query.data in ["sd_notif_on", "sd_notif_off"] or query.data.startswith("sd_interval_") or query.data == "sd_menu_back":
-        await sd_settings_callback(update, context)
 
 
 async def sd_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -390,16 +225,18 @@ async def sd_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             reply_markup = InlineKeyboardMarkup(keyboard)
             # Store user login for background polling
             sd_user_logins[chat_id] = login_id
-            
-                sd_user_settings[str(chat_id)] = {
-                    'notifications_enabled': True,
-                    'interval_minutes': 5
-                }
-                save_sd_settings(sd_user_settings)
-            
             # Store initial incidents for tracking
             try:
-                entries = sd_get_incidents(token)
+                entries = sd_get_incidents(session["token"])
+                last_incidents[login_id] = {parse_incident(e)["inc_num"] for e in entries}
+            except:
+                pass
+            
+            # Store user login for background polling
+            sd_user_logins[chat_id] = login_id
+            # Store initial incidents for tracking
+            try:
+                entries = sd_get_incidents(session["token"])
                 last_incidents[login_id] = {parse_incident(e)["inc_num"] for e in entries}
             except:
                 pass
@@ -419,19 +256,6 @@ async def sd_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("✅ Токен сохранён!")
         # For token auth, store chat_id for background polling
         sd_user_logins[chat_id] = str(chat_id)
-        
-        # Initialize user settings if not exists
-        global sd_user_settings
-    global sd_user_logins
-    global last_incidents
-        sd_user_settings = load_sd_settings()
-        if str(chat_id) not in sd_user_settings:
-            sd_user_settings[str(chat_id)] = {
-                'notifications_enabled': True,
-                'interval_minutes': 5
-            }
-            save_sd_settings(sd_user_settings)
-            
         await sd_show_incidents(update, context, chat_id)
     else:
         # Не в процессе авторизации - игнорируем
@@ -521,115 +345,14 @@ async def sd_show_incidents(
             sd_sessions.pop(chat_id, None)
 
 
-# === BACKGROUND POLLING: ПРОВЕРКА НОВЫХ ИНЦИДЕНТОВ ===
-async def check_incidents_background(context: ContextTypes.DEFAULT_TYPE):
-    """Background task: проверяет новые инциденты с учетом настроек пользователя"""
-    import logging
-    logger = logging.getLogger(__name__)
-    
-    bot = context.application.bot
-    
-    # Load settings
-    global sd_user_settings
-    global sd_user_logins
-    global last_incidents
-    sd_user_settings = load_sd_settings()
-    
-    if not sd_user_logins:
-        return
-    
-    for chat_id, login_id in list(sd_user_logins.items()):
-        # Check if notifications are enabled for this user
-        user_settings = sd_user_settings.get(str(chat_id), {})
-        if not user_settings.get('notifications_enabled', True):
-            continue
-        
-        try:
-            session = sd_sessions.get(chat_id)
-            if not session or not session.get("token"):
-                continue
-            
-            entries = sd_get_incidents(session["token"])
-            current_incident_ids = {parse_incident(e)["inc_num"] for e in entries}
-            previous_ids = last_incidents.get(login_id, set())
-            new_ids = current_incident_ids - previous_ids
-            
-            if new_ids:
-                new_incidents = [e for e in entries if parse_incident(e)["inc_num"] in new_ids]
-                
-                text = f"🔔 <b>Новые инциденты ({len(new_ids)})</b>\n\n"
-                
-                for entry in new_incidents[:5]:
-                    inc = parse_incident(entry)
-                    text += f"🔹 #{inc['inc_num']}\n"
-                    text += f"   📝 {inc['short_desc']}\n"
-                    text += f"   👤 {inc['assignee']} | 📅 {inc['submit_date']}\n\n"
-                
-                if len(new_incidents) > 5:
-                    text += f"... и ещё {len(new_incidents) - 5} инцидентов"
-                
-                try:
-                    await bot.send_message(chat_id, text, parse_mode="HTML")
-                except Exception as e:
-                    pass
-            
-            last_incidents[login_id] = current_incident_ids
-            
-        except Exception as e:
-            continue
-
-
-# Store job references for dynamic interval updates
-background_jobs = {}
-
-def register_sd_background_task(app):
-    """Зарегистрировать фоновую задачу проверки инцидентов"""
-    jq = app.job_queue
-    
-    # Default: run every 5 minutes (will be filtered by user settings in the task)
-    job = jq.run_repeating(check_incidents_background, interval=300, first=60)
-    background_jobs['sd_polling'] = job
-    print("✅ Background task for SD incident polling registered (every 5 minutes, respects user settings)")
-
-
-def update_background_interval(app, interval_minutes: int):
-    """Обновить интервал фоновой задачи"""
-    jq = app.job_queue
-    
-    # Remove old job
-    if 'sd_polling' in background_jobs:
-        background_jobs['sd_polling'].remove()
-    
-    # Create new job with updated interval
-    job = jq.run_repeating(check_incidents_background, interval=interval_minutes * 60, first=60)
-    background_jobs['sd_polling'] = job
-    print(f"✅ Background polling interval updated to {interval_minutes} minutes")
-
-
 # === РЕГИСТРАЦИЯ В ПРИЛОЖЕНИИ ===
 def register_sd_handlers(app):
     """Добавить обработчики ServiceDesk в бота"""
     app.add_handler(CommandHandler("sd", sd_start))
-    app.add_handler(CommandHandler("sdmenu", sd_menu))
     app.add_handler(CommandHandler("my", sd_my))
     app.add_handler(CallbackQueryHandler(sd_callback))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, sd_message))
     print("✅ ServiceDesk обработчики зарегистрированы")
-
-
-# === EXPORTED STORAGE ===
-def get_sd_sessions():
-    return sd_sessions
-
-def get_sd_user_settings():
-    return sd_user_settings
-
-def set_sd_user_logins(logins):
-    global sd_user_logins
-    sd_user_logins = logins
-
-def get_sd_user_logins():
-    return sd_user_logins
 
 
 # === Standalone запуск (для тестирования) ===

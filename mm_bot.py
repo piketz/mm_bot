@@ -445,7 +445,7 @@ def main():
                 version = os.getenv("BOT_VERSION", "unknown")
                 try:
                     await app.bot.send_message(chat_id=4279064, text=f"Bot started! Version: {version}")
-                    print(f"Startup notification sent to admin (version: {version})")
+                    print(f"Startup notification sent (version: {version})")
                 except Exception as e:
                     print(f"Failed to send startup notification: {e}")
 
@@ -458,7 +458,6 @@ def main():
             app.add_handler(CommandHandler("adduser", add_user))
             app.add_handler(MessageHandler(filters.Document.ALL, update_excel))
             servicedesk.register_sd_handlers(app)
-            servicedesk.register_sd_background_task(app)
             # Register background task for SD incident polling (every 5 minutes)
             app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, listen_chat))
 

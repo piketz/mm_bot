@@ -4,7 +4,7 @@ WORKDIR /app
 
 # Version argument
 ARG VERSION=unknown
-ENV BOT_VERSION=
+ENV BOT_VERSION=$VERSION
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends     curl     && rm -rf /var/lib/apt/lists/*
@@ -25,4 +25,4 @@ RUN mkdir -p /app/logs
 # Set environment variables
 ENV PYTHONUNBUFFERED=1
 
-CMD [python, mm_bot.py]
+CMD ["python", "mm_bot.py"]
