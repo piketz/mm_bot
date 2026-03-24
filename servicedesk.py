@@ -8,11 +8,12 @@ import os
 import urllib.error
 import urllib.parse
 import urllib.request
+import base64
+import hashlib
 
+from cryptography.fernet import Fernet
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import (ApplicationBuilder, CallbackQueryHandler,
-                          CommandHandler, ContextTypes, MessageHandler,
-                          filters)
+from telegram.ext import ContextTypes
 
 # === КОНФИГУРАЦИЯ ===
 BASE_URL = "https://mobilebmc.tander.ru"
@@ -21,14 +22,37 @@ API_INCIDENTS = f"{BASE_URL}/api/arsys/v1/entry/HPD:Help%20Desk"
 
 # Хранилище сессий
 sd_sessions = {}
-SD_TOKENS_FILE = "sd_tokens.json"  # user_id -> {"token": str, "login_id": str}
+SD_TOKENS_FILE = "sd_tokens.json"
+SD_CREDS_FILE = "sd_creds.json"
+SD_KEY_FILE = ".sd_key"  # Файл с ключом шифрования
 sd_states = {}  # user_id -> state
+sd_user_logins = {}
+last_incidents = {}
 
-# === BACKGROUND POLLING: ХРАНИЛИЩЕ ПОЛЬЗОВАТЕЛЕЙ И ИНЦИДЕНТОВ ===
-# chat_id -> login_id mapping (for background polling)
-sd_user_logins = {}  # {chat_id: login_id}
-# last known incident IDs per login_id
-last_incidents = {}  # {login_id: set(incident_ids)}
+# === ШИФРОВАНИЕ ===
+def get_fernet():
+    """Получить Fernet с ключом или создать новый"""
+    if os.path.exists(SD_KEY_FILE):
+        with open(SD_KEY_FILE, "rb") as f:
+            key = f.read()
+    else:
+        key = Fernet.generate_key()
+        with open(SD_KEY_FILE, "wb") as f:
+            f.write(key)
+        os.chmod(SD_KEY_FILE, 0o600)
+    return Fernet(key)
+
+
+def encrypt_password(password: str) -> str:
+    """Зашифровать пароль"""
+    f = get_fernet()
+    return base64.b64encode(f.encrypt(password.encode())).decode()
+
+
+def decrypt_password(encrypted: str) -> str:
+    """Расшифровать пароль"""
+    f = get_fernet()
+    return f.decrypt(base64.b64decode(encrypted.encode())).decode()
 
 
 # === SERVICEDESK API ===
@@ -45,11 +69,78 @@ def save_sd_tokens(tokens):
         json.dump(tokens, f)
 
 
+def load_sd_creds():
+    """Загрузить сохранённые логин/пароль (с дешифровкой)"""
+    try:
+        with open(SD_CREDS_FILE, "r") as f:
+            data = json.load(f)
+        # Расшифровать пароли
+        for chat_id, cred in data.items():
+            if "password" in cred and cred["password"]:
+                try:
+                    cred["password"] = decrypt_password(cred["password"])
+                except:
+                    pass  # Уже расшифрован или старый формат
+        return data
+    except:
+        return {}
+
+
+def save_sd_creds(creds):
+    """Сохранить логин/пароль (с шифрованием)"""
+    # Шифровать пароли
+    encrypted_creds = {}
+    for chat_id, cred in creds.items():
+        encrypted_creds[chat_id] = {
+            "login": cred.get("login"),
+            "password": encrypt_password(cred["password"]) if cred.get("password") else ""
+        }
+    with open(SD_CREDS_FILE, "w") as f:
+        json.dump(encrypted_creds, f)
+
+
+def refresh_token_if_needed(chat_id: int) -> bool:
+    """Обновить токен если истёк. Возвращает True если обновлён."""
+    tokens = load_sd_tokens()
+    creds = load_sd_creds()
+    
+    if str(chat_id) not in tokens:
+        return False
+    
+    session = tokens[str(chat_id)]
+    login = session.get("login_id") or creds.get(str(chat_id), {}).get("login")
+    password = creds.get(str(chat_id), {}).get("password")
+    
+    if not login or not password:
+        return False
+    
+    try:
+        new_token = sd_login(login, password)
+        session["token"] = new_token
+        tokens[str(chat_id)] = session
+        save_sd_tokens(tokens)
+        print(f"✅ Токен обновлён для {login}")
+        return True
+    except Exception as e:
+        print(f"❌ Не удалось обновить токен: {e}")
+        return False
+        return False
+    
+    try:
+        new_token = sd_login(login, password)
+        session["token"] = new_token
+        tokens[str(chat_id)] = session
+        save_sd_tokens(tokens)
+        print(f"✅ Токен обновлён для {login}")
+        return True
+    except Exception as e:
+        print(f"❌ Не удалось обновить токен: {e}")
+        return False
+
+
 def sd_login(login_id: str, password: str) -> str:
     """Авторизация в ServiceDesk"""
-    data = urllib.parse.urlencode({"username": login_id, "password": password}).encode(
-        "utf-8"
-    )
+    data = urllib.parse.urlencode({"username": login_id, "password": password}).encode("utf-8")
     req = urllib.request.Request(
         API_JWT_LOGIN,
         data=data,
@@ -93,7 +184,6 @@ def sd_get_incidents(token: str, group: str = "РГ Уфа Восток фили
 def parse_incident(entry: dict) -> dict:
     values = entry.get("values", entry)
 
-    # Short Description
     short_desc = (
         values.get("Short Description")
         or values.get("Summary")
@@ -102,7 +192,6 @@ def parse_incident(entry: dict) -> dict:
         or ""
     )[:80]
 
-    # Full Description
     description = (
         values.get("Description")
         or values.get("Detailed Description")
@@ -110,7 +199,6 @@ def parse_incident(entry: dict) -> dict:
         or ""
     )[:500]
 
-    # SLA
     sla = (
         values.get("SLA")
         or values.get("SLA Status")
@@ -132,16 +220,16 @@ def parse_incident(entry: dict) -> dict:
 
 
 # === ОБРАБОТЧИКИ TELEGRAM ===
+
 async def sd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Команда /sd - начало работы с ServiceDesk"""
     chat_id = update.effective_chat.id
 
-    # Проверяем сохранённый токен
     tokens = load_sd_tokens()
     if str(chat_id) in tokens:
         saved = tokens[str(chat_id)]
         sd_sessions[chat_id] = saved
-        # Показываем меню
+        
         keyboard = [
             [InlineKeyboardButton("📋 Все заявки", callback_data="sd_all")],
             [InlineKeyboardButton("👤 Мои заявки", callback_data="sd_my")],
@@ -160,16 +248,13 @@ async def sd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await update.message.reply_text(
-        "📋 ServiceDesk (Magnit)\n\n" "Выберите способ авторизации:",
+        "📋 ServiceDesk (Magnit)\n\nВыберите способ авторизации:",
         reply_markup=reply_markup,
     )
 
 
 async def sd_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка кнопок"""
-    print(
-        f"[CALLBACK] data={update.callback_query.data if update.callback_query else None}"
-    )
     query = update.callback_query
     await query.answer()
     chat_id = query.message.chat.id
@@ -186,17 +271,26 @@ async def sd_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await sd_show_incidents(update, context, chat_id, filter_type="all")
     elif query.data == "sd_my":
         await sd_show_incidents(update, context, chat_id, filter_type="my")
+    elif query.data == "sd_logout":
+        # Выйти из аккаунта
+        sd_sessions.pop(chat_id, None)
+        sd_states.pop(chat_id, None)
+        tokens = load_sd_tokens()
+        creds = load_sd_creds()
+        tokens.pop(str(chat_id), None)
+        creds.pop(str(chat_id), None)
+        save_sd_tokens(tokens)
+        save_sd_creds(creds)
+        await query.message.reply_text("✅ Вы вышли из аккаунта.")
 
 
-async def sd_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработка текстовых сообщений для авторизации"""
-    print(
-        f"[SD_MESSAGE] chat_id={update.message.chat.id}, text={update.message.text[:20]}"
-    )
+async def sd_handle_auth(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработка авторизации SD (вызывается из handle_message)"""
     chat_id = update.message.chat.id
     text = update.message.text.strip()
     state = sd_states.get(chat_id)
-    print(f"[SD_STATE] chat_id={chat_id}, state={state}")
+
+    print(f"[SD_AUTH] chat_id={chat_id}, state={state}")
 
     if state == "awaiting_login":
         sd_sessions[chat_id] = {"login_id": text}
@@ -212,41 +306,38 @@ async def sd_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             sd_sessions[chat_id] = {"token": token, "login_id": login_id}
             sd_states.pop(chat_id, None)
 
-            # Сохраняем токен для пользователя
+            # Сохраняем токен
             tokens = load_sd_tokens()
             tokens[str(chat_id)] = {"token": token, "login_id": login_id}
             save_sd_tokens(tokens)
 
-            # Показываем меню выбора
+            # Сохраняем логин/пароль для автообновления токена
+            creds = load_sd_creds()
+            creds[str(chat_id)] = {"login": login_id, "password": text}
+            save_sd_creds(creds)
+
             keyboard = [
                 [InlineKeyboardButton("📋 Все заявки", callback_data="sd_all")],
                 [InlineKeyboardButton("👤 Мои заявки", callback_data="sd_my")],
+                [InlineKeyboardButton("🚪 Выйти", callback_data="sd_logout")],
             ]
             reply_markup = InlineKeyboardMarkup(keyboard)
-            # Store user login for background polling
+
             sd_user_logins[chat_id] = login_id
-            # Store initial incidents for tracking
             try:
-                entries = sd_get_incidents(session["token"])
+                entries = sd_get_incidents(token)
                 last_incidents[login_id] = {parse_incident(e)["inc_num"] for e in entries}
             except:
                 pass
-            
-            # Store user login for background polling
-            sd_user_logins[chat_id] = login_id
-            # Store initial incidents for tracking
-            try:
-                entries = sd_get_incidents(session["token"])
-                last_incidents[login_id] = {parse_incident(e)["inc_num"] for e in entries}
-            except:
-                pass
-            
+
             await update.message.reply_text(
                 f"✅ Успешно авторизован!\n👤 Логин: {login_id}\n\nВыберите:",
                 reply_markup=reply_markup,
             )
         except Exception as e:
-            await update.message.reply_text(f"❌ Ошибка: {str(e)}")
+            keyboard = [[InlineKeyboardButton("🔑 Попробовать снова", callback_data="sd_auth_login")]]
+            reply_markup = InlineKeyboardMarkup(keyboard)
+            await update.message.reply_text(f"❌ Ошибка: {str(e)}", reply_markup=reply_markup)
             sd_states.pop(chat_id, None)
             sd_sessions.pop(chat_id, None)
 
@@ -254,12 +345,8 @@ async def sd_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         sd_sessions[chat_id] = {"token": text}
         sd_states.pop(chat_id, None)
         await update.message.reply_text("✅ Токен сохранён!")
-        # For token auth, store chat_id for background polling
         sd_user_logins[chat_id] = str(chat_id)
         await sd_show_incidents(update, context, chat_id)
-    else:
-        # Не в процессе авторизации - игнорируем
-        pass
 
 
 async def sd_my(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -278,7 +365,6 @@ async def sd_show_incidents(
     login_id = session.get("login_id", "") if session else ""
 
     if not session or not session.get("token"):
-        # Кнопка для авторизации
         keyboard = [
             [InlineKeyboardButton("🔑 Авторизоваться", callback_data="sd_auth_login")],
         ]
@@ -291,27 +377,36 @@ async def sd_show_incidents(
         else:
             await context.bot.send_message(
                 chat_id,
-                "❌ Сессия истекла. Используйте /sd для авторизации.",
+                "❌ Сессия истекла. Авторизуйтесь:",
                 reply_markup=reply_markup,
             )
         return
 
     await context.bot.send_message(chat_id, "🔄 Загружаю заявки...")
 
+    # Попытка обновить токен если истёк
     try:
         entries = sd_get_incidents(session["token"])
-        print(
-            "[DEBUG] Sample entry:",
-            json.dumps(entries[0] if entries else {}, indent=2)[:2000],
-        )
+    except Exception as e:
+        if "истёк" in str(e).lower():
+            # Пробуем обновить токен
+            if refresh_token_if_needed(chat_id):
+                session = sd_sessions.get(chat_id)
+                if session:
+                    entries = sd_get_incidents(session["token"])
+                else:
+                    entries = []
+            else:
+                await context.bot.send_message(chat_id, "❌ Токен истёк. Войдите заново /sd")
+                return
+        else:
+            raise
 
         # Фильтрация по логину
         if filter_type == "my" and login_id:
             entries = [
-                e
-                for e in entries
-                if str(login_id).lower()
-                in str(parse_incident(e).get("assignee", "")).lower()
+                e for e in entries
+                if str(login_id).lower() in str(parse_incident(e).get("assignee", "")).lower()
             ]
 
         if not entries:
@@ -334,7 +429,10 @@ async def sd_show_incidents(
                 text += f"   ⏰ SLA: {inc['sla']}\n"
             text += "\n"
 
-        keyboard = [[InlineKeyboardButton("🔄 Обновить", callback_data="sd_refresh")]]
+        keyboard = [
+            [InlineKeyboardButton("🔄 Обновить", callback_data="sd_refresh")],
+            [InlineKeyboardButton("🚪 Выйти", callback_data="sd_logout")]
+        ]
         reply_markup = InlineKeyboardMarkup(keyboard)
 
         await context.bot.send_message(chat_id, text, reply_markup=reply_markup)
@@ -345,26 +443,7 @@ async def sd_show_incidents(
             sd_sessions.pop(chat_id, None)
 
 
-# === РЕГИСТРАЦИЯ В ПРИЛОЖЕНИИ ===
+# === РЕГИСТРАЦИЯ (пустая - всё в mm_bot) ===
 def register_sd_handlers(app):
-    """Добавить обработчики ServiceDesk в бота"""
-    app.add_handler(CommandHandler("sd", sd_start))
-    app.add_handler(CommandHandler("my", sd_my))
-    app.add_handler(CallbackQueryHandler(sd_callback))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, sd_message))
-    print("✅ ServiceDesk обработчики зарегистрированы")
-
-
-# === Standalone запуск (для тестирования) ===
-if __name__ == "__main__":
-    TOKEN = os.getenv("BOT_TOKEN", "")
-    if not TOKEN:
-        print("Установите BOT_TOKEN")
-        exit(1)
-
-    print("Запуск ServiceDesk бота...")
-    app = ApplicationBuilder().token(TOKEN).build()
-
-    register_sd_handlers(app)
-
-    app.run_polling()
+    """Добавить обработчики SD (теперь в mm_bot)"""
+    pass

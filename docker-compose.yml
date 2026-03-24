@@ -5,7 +5,7 @@ services:
     build:
       context: .
       args:
-        VERSION: ${GIT_COMMIT:-unknown}
+        VERSION: d1d9355
     container_name: mm_bot_prod
     restart: unless-stopped
     env_file:
@@ -16,4 +16,3 @@ services:
       LOG_LEVEL: INFO
     volumes:
       - ./logs:/app/logs
-      - .:/app

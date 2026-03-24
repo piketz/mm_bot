@@ -9,3 +9,5 @@ loguru==0.7.2
 python-barcode
 reportlab
 pillow
+cryptography==42.0.0
+cryptography==42.0.0

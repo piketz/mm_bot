@@ -1,1 +1,17 @@
-{"bot_token": "8367202756:AAEJLEjgoEMop1rPlxcTOmAPFY7XcWHOjg4", "admins": [4279064], "allowed": [4279064]}
+{
+    "bot_token": "8367202756:AAEJLEjgoEMop1rPlxcTOmAPFY7XcWHOjg4",
+    "admins": [4279064],
+    "allowed": [
+        4279064,
+        8256795316,
+        5242213145,
+        356114896,
+        353840047,
+        8515453915,
+        1720935090,
+        312347422,
+        8552570310,
+        999335968,
+        5193031454
+    ]
+}
