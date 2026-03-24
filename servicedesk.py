@@ -15,8 +15,7 @@ from cryptography.fernet import Fernet
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 
-# Для совместимости с mm_bot
-import servicedesk
+
 
 # === КОНФИГУРАЦИЯ ===
 BASE_URL = "https://mobilebmc.tander.ru"
