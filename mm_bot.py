@@ -9,10 +9,6 @@ from telegram.ext import (
 import time
 import os
 import re
-
-def mask_password(text):
-    """Замаскировать пароли в логах"""
-    return re.sub(r'(пароль|password|passwd):\s*\S+', r': ***', text, flags=re.IGNORECASE)
 import json
 
 CONFIG_FILE = "config.json"
