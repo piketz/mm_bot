@@ -5,7 +5,7 @@ services:
     build:
       context: .
       args:
-        VERSION: d1d9355
+        VERSION: 0fdf0e0
     container_name: mm_bot_prod
     restart: unless-stopped
     env_file:
