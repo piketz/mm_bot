@@ -15,4 +15,5 @@ services:
       SERVICE_DESK_URL: https://mobilebmc.tander.ru
       LOG_LEVEL: INFO
     volumes:
+      - .:/app
       - ./logs:/app/logs
